@@ -147,6 +147,16 @@ activemq-data/
 # SageMath parsed files
 *.sage.py
 
+# gdrive-sync: локальный конфиг, OAuth-креды и состояние — НЕ коммитить
+config.toml
+.gdrive-sync/
+# локальные настройки Claude Code (машинно-специфичные пути, разрешения сессии)
+.claude/
+# страховка на случай, если креды/состояние положат вне .gdrive-sync/
+client_secret*.json
+token.json
+*.sqlite3
+
 # Environments
 .env
 .envrc

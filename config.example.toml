@@ -1,0 +1,36 @@
+# gdrive-sync — пример конфигурации.
+# Скопируй в config.toml и отредактируй под себя.
+#
+# Конфиг описывает ТОЛЬКО намерение (что и куда зеркалить).
+# Секреты и состояние (client_secret.json, token.json, manifest.sqlite3) лежат
+# в подпапке .gdrive-sync/ рядом с этим файлом (закрыта в .gitignore).
+# Переопределить расположение можно через $GDRIVE_SYNC_HOME.
+
+[drive]
+# Корневая папка назначения на Google Drive (путь относительно "Мой диск").
+# Создаётся приложением автоматически, если её нет.
+# ВАЖНО: при scope drive.file приложение видит только то, что само создало,
+# поэтому не создавай эту папку вручную в веб-интерфейсе — пусть создаст gdrive-sync.
+dest_folder = "Backups/MacSync"
+
+# Каждый локальный корень зеркалируется в подпапку dest_folder/<name>.
+# По умолчанию <name> = basename(path); можно переопределить полем name.
+[[sources]]
+path = "/Users/andrey/Documents/Important"
+# name = "Important"
+
+[[sources]]
+path = "/Users/andrey/Work/reports"
+
+[ignore]
+# glob-маски (как в fnmatch) по basename. Имена с завершающим "/" — только папки.
+patterns = [
+    # системный/редакторский мусор
+    ".DS_Store", "*.tmp", "*.swp", "*.log",
+    # системы контроля версий и кэши
+    ".git/", "__pycache__/", ".pytest_cache/", ".ruff_cache/", ".mypy_cache/",
+    # окружения и зависимости (регенерируются — бэкапить незачем)
+    ".venv/", "venv/", "node_modules/", "*.egg-info/",
+    # артефакты сборки
+    "dist/", "build/", ".next/",
+]
