@@ -209,6 +209,20 @@ def test_fatal_drive_error_aborts_once(tmp_path):
         assert drive._n == 1  # ensure_folder вызван ровно один раз (упал сразу)
 
 
+def test_broken_symlink_skipped_not_error(tmp_path):
+    """Битый (dangling) симлинк пропускается, а не считается ошибкой."""
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "real.txt").write_text("hi")
+    (src / "dangling").symlink_to(src / "nope-missing")  # target не существует
+    cfg = Config(dest_folder="D", sources=[Source(path=src, name="src")], ignore_patterns=[])
+    drive = FakeDrive()
+    with Manifest(tmp_path / "m.sqlite3") as m:
+        stats = run_sync(cfg, drive, m, dry_run=False)
+    assert stats.errors == 0
+    assert stats.uploaded == 1  # залит только real.txt, битый симлинк пропущен
+
+
 def test_dry_run_makes_no_drive_calls(tmp_path):
     src = tmp_path / "src"
     _make_tree(src)

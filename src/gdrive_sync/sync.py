@@ -205,6 +205,10 @@ class _Engine:
                 if should_ignore(fname, is_dir=False, patterns=patterns):
                     continue
                 local_file = Path(dirpath) / fname
+                # Битый симлинк (target отсутствует) — не ошибка, просто пропускаем.
+                if local_file.is_symlink() and not local_file.exists():
+                    log.debug("пропущен битый симлинк: %s", local_file)
+                    continue
                 try:
                     self._process_file(local_file, fname, dir_parts)
                 except OSError as exc:
