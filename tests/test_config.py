@@ -57,6 +57,28 @@ def test_duplicate_names(tmp_path):
         load_config(_write(tmp_path, text))
 
 
+def test_whitelist_parsed(tmp_path):
+    text = (
+        '[drive]\ndest_folder="X"\n[[sources]]\npath="/a"\n'
+        '[ignore]\npatterns=["*.log"]\nwhitelist=["/a/keep", "~/notes"]\n'
+    )
+    cfg = load_config(_write(tmp_path, text))
+    assert len(cfg.whitelist) == 2
+    assert str(cfg.whitelist[0]) == "/a/keep"
+    assert not str(cfg.whitelist[1]).startswith("~")  # expanduser применён
+
+
+def test_whitelist_defaults_empty(tmp_path):
+    cfg = load_config(_write(tmp_path, VALID))
+    assert cfg.whitelist == []
+
+
+def test_whitelist_bad_type(tmp_path):
+    text = '[drive]\ndest_folder="X"\n[[sources]]\npath="/a"\n[ignore]\nwhitelist="/a"\n'
+    with pytest.raises(ConfigError, match="whitelist"):
+        load_config(_write(tmp_path, text))
+
+
 def test_name_with_slash(tmp_path):
     text = '[drive]\ndest_folder="X"\n[[sources]]\npath="/a"\nname="a/b"\n'
     with pytest.raises(ConfigError, match="'/'"):

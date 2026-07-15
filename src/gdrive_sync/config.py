@@ -35,6 +35,8 @@ class Config:
     dest_folder: str  # путь назначения на Drive относительно "Мой диск"
     sources: list[Source]
     ignore_patterns: list[str] = field(default_factory=list)
+    # белый список: файлы под этими путями бэкапятся, даже если подпадают под маски
+    whitelist: list[Path] = field(default_factory=list)
 
 
 def app_home() -> Path:
@@ -125,10 +127,24 @@ def load_config(path: str | os.PathLike[str]) -> Config:
         sources.append(Source(path=local, name=name))
 
     ignore = data.get("ignore", {})
-    patterns = ignore.get("patterns", []) if isinstance(ignore, dict) else []
+    if not isinstance(ignore, dict):
+        ignore = {}
+    patterns = ignore.get("patterns", [])
     _require(
         isinstance(patterns, list) and all(isinstance(p, str) for p in patterns),
         "[ignore].patterns должен быть списком строк",
     )
 
-    return Config(dest_folder=dest_folder, sources=sources, ignore_patterns=patterns)
+    raw_whitelist = ignore.get("whitelist", [])
+    _require(
+        isinstance(raw_whitelist, list) and all(isinstance(p, str) for p in raw_whitelist),
+        "[ignore].whitelist должен быть списком строк (путей)",
+    )
+    whitelist = [Path(p).expanduser() for p in raw_whitelist]
+
+    return Config(
+        dest_folder=dest_folder,
+        sources=sources,
+        ignore_patterns=patterns,
+        whitelist=whitelist,
+    )

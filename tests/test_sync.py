@@ -223,6 +223,57 @@ def test_broken_symlink_skipped_not_error(tmp_path):
     assert stats.uploaded == 1  # залит только real.txt, битый симлинк пропущен
 
 
+def test_whitelist_overrides_ignore(tmp_path):
+    """Файл под whitelist заливается, даже если подпадает под маску."""
+    src = tmp_path / "audit"
+    src.mkdir()
+    (src / "bash-audit.log").write_text("log data")
+    cfg = Config(
+        dest_folder="D",
+        sources=[Source(path=src, name="audit")],
+        ignore_patterns=["*.log"],
+        whitelist=[src],
+    )
+    drive = FakeDrive()
+    with Manifest(tmp_path / "m.sqlite3") as m:
+        stats = run_sync(cfg, drive, m, dry_run=False)
+    assert stats.uploaded == 1
+    assert {n for n, _ in drive.uploaded} == {"bash-audit.log"}
+
+
+def test_log_ignored_without_whitelist(tmp_path):
+    """Тот же .log без whitelist — отсекается маской."""
+    src = tmp_path / "audit"
+    src.mkdir()
+    (src / "bash-audit.log").write_text("log data")
+    cfg = Config(
+        dest_folder="D",
+        sources=[Source(path=src, name="audit")],
+        ignore_patterns=["*.log"],
+    )
+    drive = FakeDrive()
+    with Manifest(tmp_path / "m.sqlite3") as m:
+        stats = run_sync(cfg, drive, m, dry_run=False)
+    assert stats.uploaded == 0
+
+
+def test_whitelist_includes_ignored_subdir(tmp_path):
+    """Whitelist всей папки тянет и игнор-подпапки внутри неё."""
+    src = tmp_path / "audit"
+    (src / "build").mkdir(parents=True)
+    (src / "build" / "out.log").write_text("x")
+    cfg = Config(
+        dest_folder="D",
+        sources=[Source(path=src, name="audit")],
+        ignore_patterns=["*.log", "build/"],
+        whitelist=[src],
+    )
+    drive = FakeDrive()
+    with Manifest(tmp_path / "m.sqlite3") as m:
+        stats = run_sync(cfg, drive, m, dry_run=False)
+    assert stats.uploaded == 1  # build/out.log попал, вся папка в whitelist
+
+
 def test_dry_run_makes_no_drive_calls(tmp_path):
     src = tmp_path / "src"
     _make_tree(src)

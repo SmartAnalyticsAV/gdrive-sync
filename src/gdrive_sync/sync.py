@@ -85,6 +85,25 @@ def should_ignore(name: str, *, is_dir: bool, patterns: list[str]) -> bool:
     return False
 
 
+def _path_under(path: Path, root: Path) -> bool:
+    """path равен root или лежит внутри него."""
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def on_whitelist_path(path: Path, roots: list[Path]) -> bool:
+    """path «на пути белого списка»: лежит под корнем ИЛИ является его предком.
+
+    Вариант «предок» нужен, чтобы не отрезать папку, ВНУТРИ которой есть
+    вайтлистнутый путь (иначе os.walk туда не спустится). Для файла срабатывает
+    только «лежит под корнем».
+    """
+    return any(_path_under(path, r) or _path_under(r, path) for r in roots)
+
+
 def decide(
     size: int,
     mtime: float,
@@ -191,20 +210,28 @@ class _Engine:
 
         base_parts = self.dest_parts + [source.name]
         patterns = self.config.ignore_patterns
+        whitelist = self.config.whitelist
 
         # followlinks=False — не ходим по симлинк-папкам (защита от циклов).
         for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
-            # фильтруем dirnames на месте, чтобы не спускаться в игнор-папки
+            # фильтруем dirnames на месте, чтобы не спускаться в игнор-папки;
+            # но папки «на пути белого списка» не режем.
             dirnames[:] = [
-                d for d in dirnames if not should_ignore(d, is_dir=True, patterns=patterns)
+                d
+                for d in dirnames
+                if not should_ignore(d, is_dir=True, patterns=patterns)
+                or on_whitelist_path(Path(dirpath) / d, whitelist)
             ]
             rel_dir = Path(dirpath).relative_to(root)
             dir_parts = base_parts + list(rel_dir.parts)
 
             for fname in sorted(filenames):
-                if should_ignore(fname, is_dir=False, patterns=patterns):
-                    continue
                 local_file = Path(dirpath) / fname
+                # ignore-маски действуют, КРОМЕ файлов из белого списка
+                if should_ignore(
+                    fname, is_dir=False, patterns=patterns
+                ) and not on_whitelist_path(local_file, whitelist):
+                    continue
                 # Битый симлинк (target отсутствует) — не ошибка, просто пропускаем.
                 if local_file.is_symlink() and not local_file.exists():
                     log.debug("пропущен битый симлинк: %s", local_file)
