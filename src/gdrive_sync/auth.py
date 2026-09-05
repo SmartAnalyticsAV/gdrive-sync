@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -49,14 +50,21 @@ def get_credentials(*, interactive: bool = True) -> Credentials:
         return creds
 
     if creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-        _save(creds)
-        return creds
+        try:
+            creds.refresh(Request())
+            _save(creds)
+            return creds
+        except RefreshError:
+            # refresh-токен недействителен (отозван или истёк — типично для
+            # Testing-режима, где он живёт 7 дней). Сносим мёртвый токен и
+            # уходим на повторную авторизацию через браузер.
+            config.token_path().unlink(missing_ok=True)
+            creds = None
 
     if not interactive:
         raise AuthError(
-            "Нет валидного токена и обновление невозможно. "
-            "Запусти `gdrive-sync auth` интерактивно."
+            "Токен недействителен, обновить нельзя (возможно, истёк 7-дневный "
+            "срок Testing-режима). Запусти `gdrive-sync auth` интерактивно."
         )
 
     secret = config.client_secret_path()
