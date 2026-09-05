@@ -141,6 +141,8 @@ class _Engine:
         self.dry_run = dry_run
         self.stats = SyncStats()
         self.dest_parts = config.dest_folder.split("/")
+        # Сегмент машины (если задан) — общий для всех источников этой машины.
+        self._machine_parts = [config.machine] if config.machine else []
         # Собственная папка состояния (client_secret.json, token.json, manifest) —
         # НИКОГДА не бэкапить, даже если источник её охватывает и масок на неё нет.
         self._state_dir = app_home().resolve()
@@ -217,7 +219,7 @@ class _Engine:
             log.warning("источник не найден или не папка, пропускаю: %s", root)
             return
 
-        base_parts = self.dest_parts + [source.name]
+        base_parts = self.dest_parts + self._machine_parts + [source.name]
         patterns = self.config.ignore_patterns
         whitelist = self.config.whitelist
 
@@ -268,7 +270,7 @@ class _Engine:
         # (API выключен, нет доступа, протух токен) — вместо спама на каждый файл.
         if not self.dry_run:
             try:
-                self._ensure_folder_path(self.dest_parts)
+                self._ensure_folder_path(self.dest_parts + self._machine_parts)
             except HttpError as exc:
                 self.stats.errors += 1
                 log.error(

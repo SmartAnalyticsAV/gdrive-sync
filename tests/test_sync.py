@@ -311,6 +311,20 @@ def test_env_secrets_ignored(tmp_path):
     assert stats.uploaded == 1
 
 
+def test_machine_folder_in_path(tmp_path):
+    """С machine путь = dest/<machine>/<source>/... — каждый комп в своей папке."""
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "a.txt").write_text("x")
+    cfg = Config(dest_folder="D", sources=[Source(path=src, name="src")], machine="M1")
+    drive = FakeDrive()
+    with Manifest(tmp_path / "m.sqlite3") as m:
+        run_sync(cfg, drive, m, dry_run=False)
+        assert m.get_folder("D/M1") is not None
+        assert m.get_folder("D/M1/src") is not None
+    assert "M1" in {name for (_p, name) in drive.folders}
+
+
 def test_dry_run_makes_no_drive_calls(tmp_path):
     src = tmp_path / "src"
     _make_tree(src)

@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import os
+import socket
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -37,6 +38,14 @@ class Config:
     ignore_patterns: list[str] = field(default_factory=list)
     # белый список: файлы под этими путями бэкапятся, даже если подпадают под маски
     whitelist: list[Path] = field(default_factory=list)
+    # имя машины — подпапка под dest_folder; пусто = без разделения по машинам
+    machine: str = ""
+
+
+def _default_machine() -> str:
+    """Имя машины по умолчанию — короткий hostname (без домена)."""
+    host = (socket.gethostname() or "unknown").split(".")[0].strip()
+    return host or "unknown"
 
 
 def app_home() -> Path:
@@ -93,6 +102,19 @@ def load_config(path: str | os.PathLike[str]) -> Config:
     dest_folder = dest_folder.strip().strip("/")
     _require(bool(dest_folder), "dest_folder не может быть пустым после нормализации")
 
+    # Имя машины: подпапка под dest_folder, чтобы каждый комп зеркалил в своё.
+    # По умолчанию — имя хоста (без домена), так один config.toml годится всем.
+    machine = drive.get("machine")
+    if machine is not None:
+        _require(
+            isinstance(machine, str) and machine.strip(),
+            "[drive].machine должен быть непустой строкой",
+        )
+        machine = machine.strip().strip("/")
+        _require("/" not in machine, "[drive].machine не должен содержать '/'")
+    else:
+        machine = _default_machine()
+
     raw_sources = data.get("sources", [])
     _require(
         isinstance(raw_sources, list) and raw_sources,
@@ -147,4 +169,5 @@ def load_config(path: str | os.PathLike[str]) -> Config:
         sources=sources,
         ignore_patterns=patterns,
         whitelist=whitelist,
+        machine=machine,
     )

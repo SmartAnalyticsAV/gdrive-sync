@@ -79,6 +79,25 @@ def test_whitelist_bad_type(tmp_path):
         load_config(_write(tmp_path, text))
 
 
+def test_machine_explicit(tmp_path):
+    text = '[drive]\ndest_folder="X"\nmachine="Foo"\n[[sources]]\npath="/a"\n'
+    assert load_config(_write(tmp_path, text)).machine == "Foo"
+
+
+def test_machine_defaults_to_hostname(tmp_path):
+    import socket
+
+    cfg = load_config(_write(tmp_path, VALID))
+    assert cfg.machine == (socket.gethostname().split(".")[0] or "unknown")
+    assert cfg.machine  # непустое
+
+
+def test_machine_with_slash(tmp_path):
+    text = '[drive]\ndest_folder="X"\nmachine="a/b"\n[[sources]]\npath="/a"\n'
+    with pytest.raises(ConfigError, match="machine"):
+        load_config(_write(tmp_path, text))
+
+
 def test_name_with_slash(tmp_path):
     text = '[drive]\ndest_folder="X"\n[[sources]]\npath="/a"\nname="a/b"\n'
     with pytest.raises(ConfigError, match="'/'"):
