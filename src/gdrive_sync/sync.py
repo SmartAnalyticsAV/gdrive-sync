@@ -281,7 +281,8 @@ class _Engine:
                 return self.stats
 
         for source in self.config.sources:
-            log.info("источник: %s → %s/%s", source.path, self.config.dest_folder, source.name)
+            dest_display = "/".join(self.dest_parts + self._machine_parts + [source.name])
+            log.info("источник: %s → %s", source.path, dest_display)
             self._walk_source(source)
         return self.stats
 
