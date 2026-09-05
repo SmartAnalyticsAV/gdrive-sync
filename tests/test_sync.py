@@ -274,6 +274,43 @@ def test_whitelist_includes_ignored_subdir(tmp_path):
     assert stats.uploaded == 1  # build/out.log попал, вся папка в whitelist
 
 
+def test_never_backs_up_own_state_dir(tmp_path, monkeypatch):
+    """Папка состояния (token.json и пр.) не заливается даже БЕЗ ignore-масок."""
+    src = tmp_path / "src"
+    (src / ".gdrive-sync").mkdir(parents=True)
+    (src / ".gdrive-sync" / "token.json").write_text("SECRET")
+    (src / "data.txt").write_text("ok")
+    monkeypatch.setenv("GDRIVE_SYNC_HOME", str(src / ".gdrive-sync"))
+    cfg = Config(dest_folder="D", sources=[Source(path=src, name="src")], ignore_patterns=[])
+    drive = FakeDrive()
+    with Manifest(tmp_path / "m.sqlite3") as m:
+        stats = run_sync(cfg, drive, m, dry_run=False)
+    names = {n for n, _ in drive.uploaded}
+    assert "data.txt" in names
+    assert "token.json" not in names  # предохранитель сработал
+    assert stats.uploaded == 1
+
+
+def test_env_secrets_ignored(tmp_path):
+    """.env и т.п. отсекаются масками секретов."""
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / ".env").write_text("DB_PASSWORD=hunter2")
+    (src / ".env.test").write_text("x")
+    (src / "app.py").write_text("code")
+    cfg = Config(
+        dest_folder="D",
+        sources=[Source(path=src, name="src")],
+        ignore_patterns=[".env", ".env.*"],
+    )
+    drive = FakeDrive()
+    with Manifest(tmp_path / "m.sqlite3") as m:
+        stats = run_sync(cfg, drive, m, dry_run=False)
+    names = {n for n, _ in drive.uploaded}
+    assert names == {"app.py"}
+    assert stats.uploaded == 1
+
+
 def test_dry_run_makes_no_drive_calls(tmp_path):
     src = tmp_path / "src"
     _make_tree(src)

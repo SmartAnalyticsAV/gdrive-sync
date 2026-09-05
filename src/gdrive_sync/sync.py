@@ -24,7 +24,7 @@ from typing import Callable
 
 from googleapiclient.errors import HttpError
 
-from .config import Config
+from .config import Config, app_home
 from .drive import DriveClient, explain_error
 from .hashing import md5_file
 from .manifest import Manifest
@@ -141,6 +141,15 @@ class _Engine:
         self.dry_run = dry_run
         self.stats = SyncStats()
         self.dest_parts = config.dest_folder.split("/")
+        # Собственная папка состояния (client_secret.json, token.json, manifest) —
+        # НИКОГДА не бэкапить, даже если источник её охватывает и масок на неё нет.
+        self._state_dir = app_home().resolve()
+
+    def _is_state_dir(self, path: Path) -> bool:
+        try:
+            return path.resolve() == self._state_dir
+        except OSError:
+            return False
 
     def _ensure_folder_path(self, parts: list[str]) -> str:
         """Гарантировать дерево папок на Drive, кэшируя folderId в манифесте."""
@@ -214,14 +223,19 @@ class _Engine:
 
         # followlinks=False — не ходим по симлинк-папкам (защита от циклов).
         for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
-            # фильтруем dirnames на месте, чтобы не спускаться в игнор-папки;
-            # но папки «на пути белого списка» не режем.
-            dirnames[:] = [
-                d
-                for d in dirnames
-                if not should_ignore(d, is_dir=True, patterns=patterns)
-                or on_whitelist_path(Path(dirpath) / d, whitelist)
-            ]
+            # фильтруем dirnames на месте: не спускаемся в игнор-папки (кроме тех,
+            # что «на пути белого списка») и НИКОГДА — в собственную папку состояния.
+            kept = []
+            for d in dirnames:
+                dpath = Path(dirpath) / d
+                if self._is_state_dir(dpath):
+                    continue
+                if should_ignore(d, is_dir=True, patterns=patterns) and not on_whitelist_path(
+                    dpath, whitelist
+                ):
+                    continue
+                kept.append(d)
+            dirnames[:] = kept
             rel_dir = Path(dirpath).relative_to(root)
             dir_parts = base_parts + list(rel_dir.parts)
 

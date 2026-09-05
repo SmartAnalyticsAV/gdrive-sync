@@ -33,6 +33,10 @@ patterns = [
     ".venv/", "venv/", "node_modules/", "*.egg-info/",
     # артефакты сборки
     "dist/", "build/", ".next/",
+    # СЕКРЕТЫ — никогда не бэкапить (уход в облако = утечка)
+    ".env", ".env.*", "*.pem", "*.key", "*.p12", "id_rsa*",
+    "client_secret*.json", "token.json", "credentials.json", ".git-credentials",
+    ".gdrive-sync/",
 ]
 # Белый список (необязательно): файлы под этими путями бэкапятся, даже если
 # подпадают под маски выше. Абсолютные пути к папкам/файлам.
