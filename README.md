@@ -81,3 +81,33 @@ uv run gdrive-sync status             # состояние: конфиг, ман
 ```
 
 `--dry-run` работает офлайн (по манифесту) и к Drive не обращается.
+
+## Секреты никогда не бэкапятся
+
+Дефолтные ignore-маски исключают `.env`, `.env.*`, `*.pem`, `*.key`, `*.p12`,
+`id_rsa*`, `client_secret*.json`, `token.json`, `credentials.json`,
+`.git-credentials`. Плюс код-предохранитель: собственная папка состояния
+`.gdrive-sync/` (там `token.json` и `client_secret.json`) исключается из обхода
+всегда, независимо от масок. Не убирай эти маски, если бэкапишь папки с кодом —
+иначе секреты уедут в облако.
+
+## Расписание (cron)
+
+Обёртка [scripts/sync-cron.sh](scripts/sync-cron.sh) фиксирует PATH и cwd и пишет
+лог в `.gdrive-sync/cron.log`; запускает `sync --non-interactive`.
+
+Установить ежедневный запуск в 12:00 (в своём Терминале — из песочницы crontab не
+меняется):
+
+```bash
+( crontab -l 2>/dev/null; \
+  echo '0 12 * * * /Users/andrey/Work/Python/gdrive-sync/scripts/sync-cron.sh' ) | crontab -
+crontab -l   # проверить
+```
+
+> **⚠️ Full Disk Access.** На macOS фоновый процесс не читает `~/Documents`,
+> `~/Desktop` и др. защищённые папки без разрешения. Добавь **`/usr/sbin/cron`** в
+> System Settings → Privacy & Security → **Full Disk Access** (в списке «+», затем
+> `Cmd+Shift+G` → `/usr/sbin/cron`), иначе эти источники в фоне будут молча
+> пропускаться. Проверка: временно поставь запуск на ближайшую минуту и глянь
+> `.gdrive-sync/cron.log` на «Operation not permitted».
